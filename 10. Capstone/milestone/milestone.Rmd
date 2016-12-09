@@ -1,0 +1,127 @@
+---
+title: "Natural Language Processing: Text Prediction"
+subtitle: "Data Science Capstone – Milestone Report"
+author: "Karthik Arumugham"
+date: "22 August 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(message = FALSE, error = FALSE, warning = FALSE, collapse = TRUE,
+               tidy = FALSE, cache = TRUE, cache.path = '.cache/', 
+               fig.align = 'left', dpi = 100, fig.path = 'figures/')
+```
+
+## Abstract
+Natural Language Processing (NLP) is an area of analysis that has great and valuable applications in common daily tasks. It has been used as part of enhanced texting tools such as Swiftkey, anticipate search terms in Google, spell check errors and helping people with speech disabilities. NLP requires a collection of written texts with a common author, source, subject of type (Corpus), and the framework to manipulate it. To facilitate typing on mobile devices, SwiftKey, our corporate partner in this capstone project, builds a smart keyboard that makes it easier for people to type on their mobile devices. One cornerstone of their smart keyboard is predictive text models.
+
+## Synopsis
+The main goal of this project is to build the next word predictive model given an input word/sentence fragment within the realm of natural language processing. To do, this we are given 3 corpus in three 4 different languages – English, German, Finnish and Russian. But, I chose to only use the English language. There are three different documents that make up the corpus - texts from Twitter feed, news feed, and a blog. 
+
+## Dataset
+The data is originally from: [HC Corpora](http://www.corpora.heliohost.org). The datasets for this project can be downloaded from [Coursera-SwiftKey Datasets](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip).
+
+## Summary of Raw Data Corpus
+
+|       | Line Count | Word Count | Character Count |
+--------|------------|------------|-----------------|
+Blog    |     899288 |   37334690 |       210160014 |
+News    |    1010242 |   34372720 |       205811889 |
+Twitter |    2360148 |   30374206 |       167105338 |
+
+## Data Cleaning
+
+The following steps were taken to handle special words and characters.
+
+- **Lower case**: Converted to lower case to help in the further steps.
+- **Transliterate characters**: Replaced diacritic/accent characters (âêîôûŷŵ äëïöüÿ àèìòù áéíóúý ãñõ ø) by transforming to Latin-ASCII. Removed all characters that is not a letter, number, or common symbols by transforming to ASCII.
+- **Contractions**: Replaced contractions with expanded form.
+- **Date**: Replaced variations of date formats with `<date>` tag.
+- **Time**: Replaced variations of time formats with `<time>` tag.
+- **Phone**: Replaced variations of phone number formats with `<phone>` tag.
+- **Geo-coordinates**: Replaced variations of geo-coordinates with `<latlong>` tag.
+- **Number**: Replaced variations of numbers with `<num>` tag.
+-**Email Address:** Replaced variations of e-mail address with `<email>` tag.
+- **Website Address**: Replaced variations of URL starting with "http" and "www" with `<url>` tag.
+- **Twitter Handle**: Replaced variations of Twitter handles with `<twitter_handle>` tag.
+- **Twitter Hashtag**: Replaced variations of Twitter hashtags with `<twitter_hashtag>` tag.
+- **Emoticons**: Replaced possible variations of emoticons as defined [here](http://en.wikipedia.org/wiki/List_of_emoticons) with `<emoticon>` tag.
+- **Apostrophe**: Removed all occurences of `'` outside the word boundary. So non-contraction words like `America's` are retained to preserve the sentence structure.
+- **Punctuation marks**: Removed punctuations marks like `,$/\&+=@#^%_~-"asterisk and backtick` excluding end-marks like `!?.`.
+- **Profanity**: Replaced profane words based on a custom compiled dictionary of 1293 words with `<profanity>` tag.
+- **Sentence Split**: Split to individual sentences based on end marks `!?.`
+- **Extra Spaces**: Removed extra spaces.
+- **Mis-spellings/Slangs**: Datafeed from News and Blog sites would almost be void of any spelling issues. But Twitter is replete with slangs/mis-spellings. The replacements cannot be automated, as there could be multiple replacements for a particular mistake. Though this step can be processed through packages such as qdap::check_spelling and hunspell, it requires manual intervention to pick the correct word. So this is beyond the scope for now.
+- **Word Split**: Split all words in each sentence.
+
+
+
+
+## Summary of Clean Data Corpus
+
+
+** Summary stats on sentence length:**
+
+
+
+
+
+##Tokenization
+
+As the file sizes are too large, a small 10% random sample of the files have been considered and loaded.
+
+In this step the sentences are broken down into groups of words each of length 1 to 4 called ngrams. It is important to note that the ngrams are formed only within the boundary of the sentence. The frequencies are also recorded. This will help us find the probabilities of occurrence for each of the ngrams.
+
+**Total n-gram generated:**
+The frequencies of the n-gram terms are very sparsely distributed, approximate 90% of terms are very rarely used, only appears couple times, they are of no use for training the word predicting model and can be ignored for quick predictions. Appendix 2 shows the plot of the Top 20 ngrams from the combined corpus. Appendix 3 shows the plot of ngram frequencies and is evident that the ngrams are sparse.
+
+
+**Top 10 1-grams:**
+
+
+**Top 10 2-grams:**
+
+
+**Top 20 3-grams:**
+
+
+**Top 20 4-grams:**
+
+
+##Word Prediction Algorithm
+There are various techniques. The most common is the Simple Good Turing. So given any phrase or sentence, only the last few words are considered to form ngrams - 1,2,3. First the 3-gram is searched in the 4-gram table. If the input phrase is not in 4-gram table, the 3-gram table is considered. If there are matches, the trigrams with the highest probability are considered for the prediction. The end words that complete the selected trigrams are the new predicted words. But the limitation is that the probabilities are heavily dependent on the individual ngram sample size and not across different ngrams. One way to overcome this is to use the markov chain probability property `P(A,B) = P(B|A) * P(A)`.
+
+For example, `P(I do not know) = P(know|I do not) * P(not|I do) * P(do|I) * P(I)`. From the below consolidated probability table (top 2 rows):
+`P(I do not know) = 1.492427e-04 * 0.0006115575 * 0.0007181714 * 0.01584086
+                  = 1.038334e-12`
+
+
+
+Top 20 predictions for the sentence _"When you were in Holland you were like 1 inch away from me but you hadn't time to take a"_
+
+First `to take a` is checked with 3-grams. If the predicted results are few then `take a` is checked with 2-grams and finally `a` with 1-grams.
+
+#Next Steps
+
+* Implement an advanced prediction model.
+* Explore ways to improve efficiency and accuracy.
+* Implement model as a Shiny App (mobile responsive)
+
+##Appendix
+
+1. **Resources Used**
+- Machine: Amazon EC2 m4.4xlarge instance (16 Cores, 64GB RAM)
+- AMI: RStudio-0.99.491_R-3.2.3_ubuntu-14.04-LTS-64bit (ami-b277bad1)
+- Time:
+    - Data Cleaning: ~ 40 minutes
+    - N-grams: ~ 10 minutes
+    - Probability table: ~ 10 minutes
+- CPU Utilization:
+
+<img src="aws.png" height="400px" width="400px"/>
+
+2.**Plot of Top 20 ngrams from the combined corpus**
+
+
+3.**Plot of ngram frequencies**
