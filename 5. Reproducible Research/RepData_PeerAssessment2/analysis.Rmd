@@ -1,0 +1,174 @@
+---
+title: "Impact of Severe Weather Events on Public Health and Economy in the United States"
+author: "Karthik Arumugham"
+date: "12 April 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Synopsis
+
+The U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, crop and property damage. Preventing such outcomes to the extent possible is a key concern.
+
+The objective of this project is to examine the impact of different weather events on public health and economy based on the storm data available from 1950 - 2011 and address the following two questions:
+
+* Across the US, which types of events are most harmful with respect to population health?
+* Across the US, which types of events have the greatest economic consequences?
+
+Note:
+
+* Damages data is NOT inflation adjusted.
+* There are few mis-matches between the values of damage and the comments in REMARKS variable.
+
+## Data Processing
+
+**Environment**
+```{r cache = TRUE, warning=FALSE}
+sessionInfo()
+```
+**Loading necessary packages**
+```{r}
+library(knitr)
+opts_chunk$set(echo = TRUE)
+```
+
+**Download and read the Dataset**
+```{r cache = TRUE, warning=FALSE}
+if(!file.exists("repdata-data-StormData.csv.bz2")){download.file("http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2",destfile="repdata-data-StormData.csv.bz2")}
+data <- read.csv("repdata-data-StormData.csv.bz2", header=TRUE)
+```
+
+Examine the dataset
+```{r cache = TRUE, warning=FALSE}
+dim(data)
+names(data)
+```
+
+The required columns are:
+
+* BGN_DATE: Date
+* EVTYPE: Type of weather event
+* FATALITIES: Number of fatalities
+* INJURIES: Number of injuries
+* PROPDMG: Amount of property damage
+* PROPDMGEXP: Exponential of property damage
+* CROPDMG: Amount of crop damage
+* CROPDMGEXP: Exponential of crop damage
+
+Examine the number of events recorded for each year from 1950-2011
+```{r cache = TRUE, warning=FALSE}
+data$year <- as.numeric(format(as.Date(data$BGN_DATE, format = "%m/%d/%Y %H:%M:%S"), "%Y"))
+hist(data$year, breaks = 30, main="Histogram of events", ylab ="Year")
+abline(h=3.5e+04)
+```
+
+It is evident from the histogram that from 1950-1995 there are less than 35K events per year. There is also a steep increase in events recorded by about 30K between 1995 and 1996. Further all years from 1996 have atleast 60K events recorded per year. So to reduce the bias in the data sample, extract data only from 1996-2011. 
+
+```{r cache = TRUE, warning=FALSE}
+data <- data[data$year>=1996,]
+dim(data)
+```
+
+The new dataset is `72.4%` of the original dataset. Now examine the types of events.
+
+```{r cache = TRUE, warning=FALSE}
+str(data$EVTYPE)
+unique(data$EVTYPE)[1:10]
+```
+
+There are `985` unique types of events that impact public health and the economy.  
+But there are only 48 event types strictly defined as per the `Storm Data Event Table` in page 6 of the document `[NWSI 10-1605 AUGUST 17, 2007]` <https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf>
+We need to rectify the EVTYPE values. But this isn't part of the scope for this project.
+
+Now let's proceed to find answers for the questions outlined in the synopsis.
+
+**Across the US, which types of events are most harmful with respect to population health?**
+
+Extract required columns and view the dataset
+```{r cache = TRUE, warning=FALSE}
+#Extract only the columns that contain Events, No of Fatalities and Injuries
+data1 <- subset(data, select=c(EVTYPE,FATALITIES,INJURIES))
+str(data1)
+head(data1)
+```
+
+The data is in good shape. Now let's proceed.
+```{r cache = TRUE, warning=FALSE}
+#Aggregate the Events by taking sum of columns for common Events
+data1 <- aggregate(.~EVTYPE, data=data1, sum)
+#Sort and Extract Top 15 Events
+fatal <- data1[order(-data1$FATALITIES), ][1:15, 1:2]
+injury <- data1[order(-data1$INJURIES), ][1:15, c(1,3)]
+```
+
+**Across the US, which types of events have the greatest economic consequences?**
+
+```{r cache = TRUE, warning=FALSE}
+#Extract only the columns that contain Events, Crop and Property Damage Estimates
+data2 <- data[,c('EVTYPE','CROPDMG','CROPDMGEXP','PROPDMG','PROPDMGEXP')]
+str(data2)
+head(data2)
+```
+
+`CROPDMGEXP` and `PROPDMGEXP` are factors. Examine the levels of these factors.
+```{r cache = TRUE, warning=FALSE}
+levels(data2$CROPDMGEXP)
+levels(data2$PROPDMGEXP)
+```
+
+The factor levels aren't standarised and numeric. For example 'B' denotes Billion (10^6), 5 denotes 10^5 and so on. Other special characters like ?,- are arbitrary and must be removed. Rename the factor levels for numeric computation.
+```{r}
+#Rename the factor Levels for the column containing Exponent data
+levels(data2$CROPDMGEXP) <- c(0,1,100,0,1e+09,1e+03,1e+06,1e+03,1e+06)
+levels(data2$PROPDMGEXP) <- c(0,0,0,1,10,100,1e+03,1e+04,1e+05,1e+06,1e+07,1e+08,0,1e+09,100,1e+03,1e+06,100,1e+06)
+#Change Factor to Numeric Class for the columns with the Exponent data
+data2$CROPDMGEXP <- as.numeric(levels(data2$CROPDMGEXP))[data2$CROPDMGEXP]
+data2$PROPDMGEXP <- as.numeric(levels(data2$PROPDMGEXP))[data2$PROPDMGEXP]
+#Create a new column which is the product of damage estimates and exponent
+data2$CROPDMGVAL <- data2$CROPDMG * data2$CROPDMGEXP
+data2$PROPDMGVAL <- data2$PROPDMG * data2$PROPDMGEXP
+str(data2)
+head(data2)
+```
+
+The data is in good shape. Now let's proceed.
+```{r cache = TRUE, warning=FALSE}
+#Extract the data that contains only the Events and the new Damage estimates
+data3 <- subset(data2, select=c(EVTYPE,CROPDMGVAL,PROPDMGVAL))
+#Aggregate the Events by taking sum of columns for common Events
+data3 <- aggregate(.~EVTYPE, data=data3, sum)
+#Sort and Extract Top 15 Events
+crop <- data3[order(-data3$CROPDMGVAL), ][1:15, 1:2]
+prop <- data3[order(-data3$PROPDMGVAL), ][1:15, c(1,3)]
+```
+
+## Results
+
+**Across the US, which types of events are most harmful with respect to population health?**
+
+```{r}
+fatal
+injury
+#Plot the top 15 Events
+par(mfrow = c(1, 2), mar = c(12, 4, 3, 2), cex = 0.7)
+barplot(fatal$FATALITIES, las = 3, names.arg = fatal$EVTYPE, main = "Top Events for Fatalities [1996-2011]", ylab = "No of People")
+barplot(injury$INJURIES, las = 3, names.arg = injury$EVTYPE, main = "Top Events for Injuries [1996-2011]", ylab = "No of People")
+```
+
+It is evident from the plot that the top events that cause fatalities and injury are different. `Excessive Heat` kills people more `(1797)` and `Tornado` causes injury to people more `(20667)` than any other event. But `Tornado` is also the second top most event that causes fatalities `(1511)`.
+
+**Across the US, which types of events have the greatest economic consequences?**
+
+```{r}
+crop
+prop
+#Plot the Top 15 Events
+par(mfrow = c(1, 2), mar = c(12, 4, 3, 2), cex = 0.7)
+barplot(crop$CROPDMGVAL/(10^9), las = 3, names.arg = crop$EVTYPE, main = "Top Events for Crop Damages [1996-2011]", ylab = "Cost of damages ($bn)")
+barplot(prop$PROPDMGVAL/(10^9), las = 3, names.arg = prop$EVTYPE, main = "Top Events for Property Damages [1996-2011]", ylab = "Cost of damages ($bn)")
+```
+
+It is evident from the plot that the top events that cause greatest crop and property damage are different. `Drought` damages crops more `(US$ 13.3bn)` and `Flood` damages properties more `(US$ 143bn)` than any other event. But events like `Drought`, `Excessive Heat`, `Extreme Cold`, etc are unique only to crop damages. So excluding them means that the top two events for both crop and property damages are the same - `Flood` and `Hurricane`.

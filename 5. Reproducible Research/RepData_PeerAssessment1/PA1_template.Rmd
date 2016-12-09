@@ -1,0 +1,195 @@
+---
+title: "Reproducible Research: Peer Assessment 1"
+output: 
+  html_document:
+    keep_md: true
+---
+Created by Karthik Arumugham on April 10, 2016
+
+## Loading necessary packages
+```{r}
+library(knitr)
+opts_chunk$set(echo = TRUE)
+library(lattice)
+```
+
+## Loading and preprocessing the data
+###1. Load the data
+```{r}
+if(!file.exists('activity.csv')){
+    unzip('activity.zip')
+}
+data <- read.csv("activity/activity.csv", header = TRUE)
+```
+### 2. Transform the data into a suitable format for analysis
+
+Take a look at the contents of the `data` dataset.
+```{r}
+dim(data)
+head(data)
+str(data)
+```
+From the summary it is evident that `date` is a factor. So change the `date` into the required dateformat class.
+```{r}
+data$date <- as.Date(data$date)
+str(data)
+```
+Now the `data` dataset is ready for analysis.
+
+* Note 1: The coding of the interval names is as follows - 500 should be considered as 5:00 and 1000 as 10:00, and so on. The x-axis can be considered as a full 24-hour-day starting from midnight.
+
+* Note 2: There are a number of days/intervals where there are missing values (coded as `NA`). Missing values in the dataset are ignored for further analysis.
+
+## What is mean total number of steps taken per day?
+
+### 1. Total number of steps taken per day
+```{r}
+stepsDay <- aggregate(steps ~ date, data=data, sum)
+```
+
+Check the `stepsDay` dataset
+```{r}
+dim(stepsDay)
+head(stepsDay)
+```
+
+### 2. Histogram of the total number of steps taken each day
+```{r}
+hist(stepsDay$steps, main="Histogram of the total steps taken per day", xlab='Total steps taken per day', ylab='Frequency', breaks=14)
+```
+
+### 3. Mean and median of the total number of steps taken per day
+
+Compute the mean
+```{r}
+stepsDayMean <- mean(stepsDay$steps)
+stepsDayMean
+```
+
+Compute the median
+```{r}
+stepsDayMedian <- median(stepsDay$steps)
+stepsDayMedian
+```
+
+## What is the average daily activity pattern?
+
+### 1. Time series plot of average number of steps taken for each 5-minute interval
+```{r}
+dayAvg <- aggregate(steps ~ interval, data=data, "mean")
+```
+
+Take a look at the `dayAvg` dataset.
+```{r}
+dim(dayAvg)
+str(dayAvg)
+head(dayAvg)
+```
+
+The `dayAvg` dataset not contains `288` 5 minute intervals with the corresponding average number of steps taken computed across two months. Now let us plot this data.
+```{r}
+plot(dayAvg$interval, dayAvg$steps, type="l",main="Average number of steps taken for each 5-minute interval", xlab='5 minute interval', ylab='Steps taken (avg)')
+```
+
+### 2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r}
+dayAvg[dayAvg$steps == max(dayAvg$steps),]
+```
+So a maximum of `206` steps is recorded on an average at `8:35 AM`
+
+## Imputing missing values
+
+### 1. Calculate and report the total number of missing values in the dataset
+```{r}
+sum(is.na(data$steps))
+```
+
+### 2. Devise a strategy for filling in all of the missing values in the dataset
+It is reasonable strategy to replace the missing values with 5-minute interval averages for steps taken.
+
+### 3. Create a new dataset that is equal to the original dataset but with the missing data filled in
+Create a new dataset `dataNew` which is a replica of `data` dataset.
+```{r}
+dataNew <- data
+```
+
+Now replace the NA values with the average values from `dayAvg` dataset
+```{r}
+for (i in 1:17568){
+        if(is.na(data$steps[i])){
+                dataNew$steps[i] <- dayAvg$steps[which(dayAvg$interval == dataNew$interval[i])]
+        }
+}
+```
+
+Examine the contents of `dataNew` dataset
+```{r}
+head(dataNew)
+sum(is.na(dataNew$steps))
+```
+Now all `NA` values have now been replaced in the `dataNew` dataset.
+
+### 4. Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day.
+```{r}
+stepsDayNew <- aggregate(steps ~ date, data=dataNew, sum)
+```
+
+```{r}
+hist(stepsDayNew$steps, main="Histogram of the total steps taken per day", xlab='Total steps taken per day', ylab='Frequency', breaks=14)
+```
+It is evident that the new histogram hasn't changed for `breaks=14`
+
+Compute the new mean
+```{r}
+stepsDayMeanNew <- mean(stepsDayNew$steps)
+stepsDayMeanNew
+```
+
+Compute the new median
+```{r}
+stepsDayMedianNew <- median(stepsDayNew$steps)
+stepsDayMedianNew
+```
+
+### 5. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+Compute the difference between the new and old mean
+```{r}
+stepsDayMeanNew - stepsDayMean
+```
+
+Compute the difference between the new and old median
+```{r}
+stepsDayMedianNew - stepsDayMedian
+```
+There is no impact of missing data on the mean, but the median has shifted to the right by `1 step`.
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+### 1. Create a new factor variable in the dataset with two levels - `weekday` and `weekend` indicating whether a given date is a weekday or weekend day
+
+```{r}
+dataNew$day <- factor(dataNew, levels = c("weekday", "weekend"))
+dataNew$day <- ifelse((weekdays(as.Date(dataNew$date)) == "Saturday") | (weekdays(as.Date(dataNew$date)) == "Sunday"),"Weekend", "Weekday")
+```
+
+Examine the `dataNew` dataset
+```{r}
+str(dataNew)
+head(dataNew)
+```
+
+### 2. Panel plot containing a time series plot of the 5-minute interval and the average number of steps taken, averaged across all weekday days or weekend days
+
+```{r}
+stepsWeek <- aggregate(steps ~ interval+day, data=dataNew, "mean")
+xyplot(steps~interval | factor(day), data = stepsWeek, type="l", layout = c(1,2),xlab="Interval",ylab="Number of steps")
+```
+
+From the two graphs, it is quite evident that the pattern of steps taken is different. The following are few inferences.
+
+* The person seems to wake-up about an hour later on weekends
+
+* There are two spikes in steps taken on weekdays, possibly an onward and return trip to and from office.
+
+* The steps taken during the entire weekend when the person is awake is more evenly distributed with no spikes unlike the weekday where the person may possible have a desk job and takes few trips to the cafeteria/restroom.

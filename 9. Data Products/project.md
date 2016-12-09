@@ -1,0 +1,79 @@
+Normal Distribution
+========================================================
+author: Karthik Arumugham
+date: Tue May 31 08:26:58 2016
+autosize: true
+
+The Application
+=======================================================
+
+This is a simple application to demonstrate the properties of a normal distribution. 
+
+It is deployed at: https://karthiaru.shinyapps.io/normal-distribution/
+
+By default the application loads a standard normal distribtion with mean($\mu$)=0 and standard deviation($\sigma$)=1.
+
+The application allows the user to:
+
+- Generate a normal disbution based on a mean and standard distribution
+- Calculate the probabilty of the tail region - left, right, both tails or in between both tails.
+
+Normal Distribution: Intro
+========================================================
+
+In probability theory, the normal (or Gaussian) distribution is a very common continuous probability distribution and used in the natural and social sciences to represent real-valued random variables whose distributions are not known.
+
+- The probability density of the normal distribution is:
+\[
+f(x \ | \ \mu,\sigma^2) = \frac{1}{\sigma\sqrt{2\pi}}e^{{-(x-\mu)^2}/{2\sigma^2}}
+\]
+- When a random variable X is distributed normally with mean $\ \mu$ and variance$\ \sigma^2$, it is denoted as $\ X \sim N (\ \mu,\ \sigma^2)$
+- The simplest case of a normal distribution is known as the standard normal distribution. This is a special case when $\ \mu=0$ and $\ \sigma=1$.
+
+Normal Distribution: Properties
+========================================================
+- It is symmetric around the point x = $\mu$, which is the mean, median and mode of the distribution.
+- The area under the curve and over the x-axis is unity.
+- 3-sigma rule or 68-95-99.7 (empirical) rule:
+    - About 68% of values drawn from the distribution are within 1 $\sigma$ away from the mean. About 95% of the values lie within 2 $\sigma$. About 99.7% are within 3 $\sigma$.
+<div align="center">
+<img src="figure/1.png" width=270>
+<img src="figure/2.png" width=270>
+<img src="figure/3.png" width=280>
+</div>
+
+Normal Distribution: R functions
+=======================================================
+
+
+```r
+#dnorm: 5 sample normal distribution
+xlim <- 0 + c(-1,1)*3.5*1;
+x <- seq(xlim[1]-diff(range(xlim))/4, xlim[2]+diff(range(xlim))/4, length.out=5); y <- dnorm(x, mean=0, sd=1)
+str(data.frame("x"=x,"y"=y))
+```
+
+```
+'data.frame':	5 obs. of  2 variables:
+ $ x: num  -5.25 -2.62 0 2.62 5.25
+ $ y: num  4.13e-07 1.27e-02 3.99e-01 1.27e-02 4.13e-07
+```
+
+
+```r
+#pnorm: Lower tail probability at -1.96
+pnorm(-1.96, mean = 0, sd = 1, lower.tail = TRUE)
+```
+
+```
+[1] 0.0249979
+```
+
+
+Normal Distribution: Approximations
+=======================================================
+The central limit theorem implies that certain distributions can be approximated by the normal distribution.
+- The binomial distribution B(n, p) is approximately normal with mean np and variance np(1-p) for large n and for p not too close to zero or one.
+- The Poisson distribution with parameter $\lambda$ is approximately normal with mean $\lambda$ and variance $\lambda$, for large values of $\lambda$.
+- The chi-squared distribution $\chi^2$(k) is approximately normal with mean k and variance 2k, for large k.
+- The Student's t-distribution t(v) is approximately normal with mean 0 and variance 1 when v reaches 30 for a 3.5% deviation at 95% of the upper tail. For 120 samples, the difference is less than 1%.

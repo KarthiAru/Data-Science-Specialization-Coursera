@@ -1,0 +1,126 @@
+---
+title: "Effect of Vitamin C on Tooth Growth in Guinea Pigs"
+author: "Karthik Arumugham"
+date: "29 April 2016"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.path='Figs/', warning=FALSE, message=FALSE)
+```
+
+##Overview
+The purpose of this data analysis is to analyze the ToothGrowth dataset by formulating several hypothesis for comparing the tooth growth of guinea pigs by supplement and dose.
+
+```{r, echo=FALSE}
+library(datasets); library(ggplot2)
+data(ToothGrowth)
+str(ToothGrowth)
+```
+
+The dataset has 60 observations, length of odontoblasts (cells responsible for tooth growth) in each of 10 guinea pigs at three dose levels of Vitamin C (0.5, 1 and 2 mg) with two delivery methods (orange juice or ascorbic acid).
+
+```{r}
+summary(ToothGrowth)
+```
+
+
+##Exploratory Analysis
+
+1. **Plot 1**: The tooth lengths seem to be normally distributed.
+2. **Plot 2**: There is a  large variation and clear seperation in tooth growth for all dose levels of ascorbic acid. But there appears to be clear seperation only for 0.5 and 1 mg/day dose levels of orange juice.
+
+##Hypothesis Testing
+
+**Hypothesis 1**:
+
+- $H_0$: Mean tooth growth from orange juice is same as ascorbic acid.
+- $H_1$: Mean tooth growth from orange juice is higher.
+
+```{r}
+h1<-t.test(len ~ supp, ToothGrowth, paired = F, var.equal = T)
+h1$conf.int; h1$p.value
+```
+The p-value >0.05 and C.I. includes 0. The $H_0$ cannot be rejected. So orange juice & ascorbic acid seem to deliver the same tooth growth without factoring dose levels.
+
+**Hypothesis 2**:
+
+- $H_0$: Mean tooth growth from orange juice is same as ascorbic acid for the dose level of 0.5 mg/day.
+- $H_1$: Mean tooth growth from orange juice is higher for the dose level of 0.5 mg/day.
+
+```{r}
+h2<-t.test(len ~ supp, data = subset(ToothGrowth, dose == 0.5), paired = F, var.equal = T)
+h2$conf.int; h2$p.value
+```
+The p-value is <0.05. The C.I. does not include 0. The $H_0$ is rejected. So 0.5 mg/day dosage of orange juice seems to deliver more tooth growth than ascorbic acid.
+
+**Hypothesis 3**:
+
+- $H_0$: Mean tooth growth from orange juice is same as ascorbic acid for the dose level of 1 mg/day.
+- $H_1$: Mean tooth growth from orange juice is higher for the dose level of 1 mg/day.
+
+```{r}
+h3<-t.test(len ~ supp, data = subset(ToothGrowth, dose == 1), paired = F, var.equal = T)
+h3$conf.int; h3$p.value
+```
+The p-value is <0.05 and the C.I. does not include 0. The $H_0$ is rejected. So 1 mg/day dosage of orange juice seems to deliver more tooth growth than ascorbic acid.
+
+**Hypothesis 4**:
+
+- $H_0$: Mean tooth growth from orange juice is same as ascorbic acid for the dose level of 2 mg/day.
+- $H_1$: Mean tooth growth from orange juice is higher for the dose level of 2 mg/day.
+
+```{r}
+h4<-t.test(len ~ supp, data = subset(ToothGrowth, dose == 2), paired = F, var.equal = T)
+h4$conf.int; h4$p.value
+```
+The p-value is >0.05 and the C.I. does include 0. $H_0$ cannot be rejected. So 2 mg/day dosage of orange juice seems to deliver same tooth growth as ascorbic acid.
+
+**Hypothesis 5**:
+
+- $H_0$: Mean tooth growth from ascorbic acid (2 mg/day) is same as orange juice (1 mg/day).
+- $H_1$: Mean tooth growth from ascorbic acid (2 mg/day) is higher than orange juice (1 mg/day).
+
+```{r}
+temp1 <- rbind(subset(ToothGrowth, (dose == 1) & (supp =="OJ")),
+               subset(ToothGrowth, (dose == 2) & (supp =="VC")))
+h5<-t.test(len ~ supp, temp1, paired = F, var.equal = T)
+h5$conf.int; h5$p.value
+```
+The p-value is >0.05 and the C.I. does include 0. The $H_0$ cannot be rejected. 2 mg/day of ascorbic acid seems to deliver same tooth growth as 1 mg/day of orange juice.
+
+**Hypothesis 6**:
+
+- $H_0$: Mean tooth growth from orange juice (2 mg/day) is same as orange juice (1 mg/day).
+- $H_1$: Mean tooth growth from orange juice (2 mg/day) is higher than orange juice (1 mg/day).
+
+```{r}
+temp2 <- rbind(subset(ToothGrowth, (dose == 1) & (supp =="OJ")),
+               subset(ToothGrowth, (dose == 2) & (supp =="OJ")))
+h6<-t.test(len ~ dose, temp2, paired = F, var.equal = T)
+h6$conf.int; h6$p.value
+```
+The p-value is <0.05 and the C.I. does not include 0. $H_0$ is rejected. So 2 mg/day of orange juice seems to deliver higher tooth growth than 1 mg/day.
+
+##Conclusion
+Increase in the dose levels seem to increase the tooth growth. Orange juice is more effective than ascorbic acid for tooth growth when the dosage is 0.5 and 1 mg/day. Both types of supplements are equally as effective when the dose is 2 mg/day. I've assumed there's a common variance in the guinea pigs population (var.equal=TRUE) and that they've used 6 different settings of 10 guinea pigs for the experiment (paired=FALSE) so as not to get biased by an earlier test.
+
+##Appendix
+
+**Plot 1: Distribution of Tooth Length**
+
+```{r, echo=FALSE}
+hist(ToothGrowth$len, breaks=10, xlab = "Tooth Length", main="")
+```
+
+**Plot 2: Tooth Length vs Supplement and Dose Levels**
+
+```{r, echo=FALSE}
+ggplot(ToothGrowth, aes(x=factor(dose), y=len)) + facet_grid(.~supp) + geom_boxplot(aes(fill = supp), show.legend = FALSE) + labs(x="Dose (mg/day)",y="Tooth Length")
+```
+
+**Plot 3**:
+```{r}
+qqnorm(ToothGrowth$len); qqline(ToothGrowth$len, col = 2)
+```
+

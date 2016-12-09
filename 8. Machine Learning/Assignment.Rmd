@@ -1,0 +1,158 @@
+---
+title: "Weight Lifting Activity Recognition"
+author: "Karthik Arumugham"
+date: "11 May 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.path='Figs/',echo=TRUE, cache=TRUE, warning=FALSE, message=FALSE)
+```
+
+## Executive Summary
+
+Qualitative activity recognition differs from conventional activity recognition in a distinctive way. While the latter is concerned with recognising which activity is
+performed, the former is concerned with assessing how (well) it is performed. The term `quality` is defined as 'conformance to specifications'. If the manner of execution of an activity is specified, then the quality can be measured by comparing its execution against this specification. Accelerometers were placed on the belt, arm-band and glove of 6 participants and on the dumbell to classify different exercises and count training repetitions. They performed barbell lifts correctly and incorrectly in 5 different ways.
+
+The goal of this project is to apply machine learning techniques to accurately predict the manner in which the participants did the exercise. This report describes how the model for the project was built, its cross validation, expected out of sample error calculation, and the choices made. It was used successfully to accurately predict all 20 different test cases.
+
+Source: [Weight Lifting Dataset](http://groupware.les.inf.puc-rio.br/har)
+
+## Loading data
+```{r}
+if(!file.exists('pml-training.csv')){
+    download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv","pml-training.csv")
+}
+if(!file.exists('pml-testing.csv')){
+    download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv","pml-testing.csv")
+}
+training <- read.csv("pml-training.csv", na.strings = c("NA", "#DIV/0!", ""))
+testing <- read.csv("pml-testing.csv", na.strings = c("NA", "#DIV/0!", ""))
+```
+The dataset has many junk entries such as NA, #DIV/0! and blank cells. This must forced as NA so that it can be cleaned in the next step.
+
+## Cleaning data
+```{r}
+train<-training[, apply(training, 2, function(x) !any(is.na(x)))] 
+test<-testing[, apply(testing, 2, function(x) !any(is.na(x)))]
+train <- train[,-c(1:7)]; test <- test[,-c(1:7)]
+dim(train); dim(test)
+library(caret); nearZeroVar(train)
+```
+Dropping all variables with NA values. Dropping user and time related fields. There are no variables that have one/few unique values. So `53` variables are suitable to fit the model. The `classe` variable is the factor variable with categories A,B,C,D&E that needs to be predicted for the manner in which the exercise was carried out.
+
+## Exploring correlations
+```{r}
+library(reshape2);
+corMat <- round(cor(train[,-53]),2)
+hc <- hclust(as.dist((1-corMat)/2))
+corMat <-corMat[hc$order, hc$order]
+corMat[lower.tri(corMat)]<- NA; diag(corMat) <- NA
+corMat <- melt(corMat, na.rm = TRUE)
+```
+
+**Plot 1: Correlation between all variables**: This shows that the variables are mostly uncorrelated with few highly correlated variables (+/- 0.8 threshold) which either must be dropped or must be subjected to a PCA. But it is interesting to note that the high correlations are between the various parameters of the data obtained from the same sensor.
+
+```{r}
+subset(corMat, value>=0.8); subset(corMat, value<=-0.8)
+```
+
+## Data Partition
+```{r}
+set.seed(12345)
+inTrain<-createDataPartition(y=train$classe, p=0.75,list=F)
+train<-train[inTrain,]; val<-train[-inTrain,]
+dim(train); dim(val)
+```
+The training set is randomly split into two for cross validation. 75% is allocated for training (actual model building), while the 25% is set aside for prediction and accuracy measurement.
+
+## Algorithm selection
+
+**Machine Specifications**
+
+* R version 3.2.4 (2016-03-10)
+
+* Platform: x86_64-apple-darwin13.4.0 (64-bit)
+
+* Running under: OS X 10.10.5 (Yosemite)
+
+**Algorithm Performance**
+```{r table2, echo=FALSE, results='asis'}
+tabl <- "
+| Algorithm                     | Package   | Method    | Time (min)| Accuracy  |
+| :---------------------------: | :-------: | :-------: | :-------: | :-------: |
+| Random Forest                 | caret     | rf        | 9.230     | 1.0000    |
+| Stochastic Gradient Boosting  | caret     | gbm       | 1.540     | 0.9756    |
+| eXtreme Gradient Boosting     | caret     | xgbTree   | 0.121     | 1.0000    |
+| eXtreme Gradient Boosting     | xgboost   | xgboost   | 0.106     | 1.0000    |
+"
+cat(tabl)
+```
+
+The above table illustrates the performance of various algorithms tested for the specified machine configuration with all variables included. This clearly illustrates that `eXtreme Gradient Boosting` out-performs other methods in this case, both in terms of accuracy and computation time. Random Forest was fine tuned with 150 trees and 27 variables at each split. Stochastic Gradient Boosting was fine tuned with 150 trees, interaction depth of 3, learning factor of 0.1, n.minobsinnode=10. For this project, `eXtreme Gradient Boosting` process using `xgboost` will be explained in detail.
+
+## Cross Validation: eXtreme Gradient Boosting
+```{r}
+library(xgboost)
+y <- as.numeric(train$classe)
+param <- list("objective" = "multi:softmax", eval_metric = "merror",
+              num_class = 12, eta = 1, gamma = 0,
+              colsample_bytree = 0.85, min_child_weight = 1)
+mdepth = 20; folds = 5; iterations = 100
+fit_xgb_cv <- xgb.cv(param=param, data=as.matrix(train[,-53]), label=y, 
+                     nfold=folds, nrounds=iterations, max_depth = mdepth, 
+                     early.stop.round = 3, maximize = FALSE, verbose=0)
+```
+
+The cross validation for multi-level logistic regression is done with a 5 fold sub sample for 100 iterations. Maximum depth is infered from Plot 2. This yields the best iteration with 0.0000 training error and 0.014403 test error at the level 25. Learning factor `eta` is set to 1 and other parameters are set to mostly default values.
+
+## Model Building: eXtreme Gradient Boosting
+```{r}
+iterations = 25; mdepth = 17
+fit_xgb = xgboost(param=param, data=as.matrix(train[,-53]), label=y, 
+                  nrounds=iterations, max_depth = mdepth, verbose=0)
+confusionMatrix(predict(fit_xgb, as.matrix(val[,-53])), as.numeric(val$classe))
+```
+
+The model is fine tuned further with the best iteration from cross validation. The expected out of sample error in this case is 0.00 with an accuracy of 100% with a 95% CI(0.999, 1) and kappa value of 1. Out-of-sample error rate is 1-Accuracy. eXtreme Gradient Boosting method has worked out really well and there is no reason to look further.
+
+## Model Inspection
+
+**Plot 2: Model Complexity**: The upper plot shows the number of leaves per level of deepness. The lower plot shows noramlized weighted cover per leaf (weighted sum of instances). From this information, we can see that the number of leaves is low after level 17. To avoid overfitting, we can restrict the depth of trees at 17.
+
+**Plot 3: Feature Importance**: In xgboost, the importance is decided based on the gain on each node contributed by the variable used for splitting. It is evident that not all variables are necessary for accurate prediction. Besides there are few clusters. So a PCA can reduce the variables and still capture a larger variance. But this is beyond the scope for this project.
+
+## Model scoring
+```{r}
+as.character(predict(fit_xgb, as.matrix(test[,-53])))
+```
+This model successfully scored 100% on all the 20 test cases.
+
+## Conclusion
+
+The 100% accuracy obtained for a dataset with 19k+ observations is a bit suspicious as machine learning algorithms are rarely that accurate. There could be a few potential problems in data gathering. The number of participants might be too low which could induce a bias for similar body types. Or there might be an inherent flaw in factor coding forcing either one of the factors every time due to the highly controlled data collection environment.
+
+## Appendix
+
+**Plot 1: Correlation between all variables**
+```{r}
+ggplot(corMat, aes(Var2, Var1, fill = value))+
+    geom_tile(color = "white")+
+    scale_fill_gradient2(low = "blue", high = "red", mid = "white",midpoint = 0, 
+                         limit = c(-1,1), space = "Lab",name="Pearson Correlation")+
+    theme_minimal()+coord_fixed()+theme(axis.text.y = element_text(size = 5))+
+    theme(axis.text.x = element_text(angle=90,vjust = 1,size = 5, hjust = 1))
+```
+
+**Plot 2: Model Complexity**
+```{r}
+library(igraph)
+xgb.plot.deepness(model = fit_xgb)
+```
+
+**Plot 3: Feature Importance**
+```{r}
+library(Ckmeans.1d.dp)
+importance_matrix <- xgb.importance(names(train), model = fit_xgb)
+xgb.plot.importance(importance_matrix)
+```

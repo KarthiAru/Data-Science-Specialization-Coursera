@@ -1,0 +1,163 @@
+---
+title: "Car Mileage Prediction Model"
+author: "Karthik Arumugham"
+date: "29 April 2016"
+output: html_document
+---
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path='Figs/',echo=FALSE, warning=FALSE, message=FALSE)
+```
+##Executive Summary
+The `mtcars` dataset, extracted from 1974 Motor Trend magazine, comprise mileage in miles per gallon (MPG), and ten aspects of automobile design and performance for 32 automobiles (1973-74 models). The regression model attempts to predict gasoline mileage from the other variables. In particular, the analysis attempts to determine whether an automatic or manual transmission is better for MPG, and quantifies the MPG difference.
+On the basis of the analyses, regression of MPG on TRANSMISSION TYPE, WEIGHT, and QUARTER MILE TIME may be best for prediction. Manual transmission delivers higher mileage by a difference of 2.93 compared to automatic transmission, provided other specs are equal.
+
+##Data processing and transformation
+```{r }
+library(knitr); library(reshape2); library(ggplot2); library(cowplot); library(car); library(MASS)
+data(mtcars)
+mydata <- mtcars
+```
+
+Load the `mtcars` dataset and necessary libraries. The description of variables can be found in the mtcars help file. Convert variables `am` and `vs` to factor variables as they are categorical. vs: V/S (0 = V-engine, 1 = straight engine). am	: Transmission (0 = automatic, 1 = manual)
+
+```{r}
+mtcars$am <- as.factor(mtcars$am)
+mtcars$vs <- as.factor(mtcars$vs)
+```
+##Exploratory Data Analysis
+1. **Appendix: Plot 1** - The `mpg` outcome variable follows a normal distribution.
+2. **Appendix: Plot 2** - The `mpg` outcome variable has a non-linear relationship with important variables such as `disp`, `wt`, `hp` and `qsec`.
+3. **Appendix: Plot 3** - `wt` has strong correlation with all variables except `qsec`. So possibly a larger variation in `mpg` can be explained by `wt` and `qsec`.
+
+4. **Appendix: Plot 4**
+* 4A: There is a clear separation on the mileage delivered by automatic and manual transmission. 
+* 4B: There is a clear separation on the mileage delivered by `V-Engine` and `Straight Engine`, with straight engines delivering higher mileage. However this is counter intuitive, as v-engines are much more compact, lighter and has better fuel efficiency. Possibly this may be due to higher influence by displacement and weight.
+* 4C: There is a clear separation on the mileage delivered by cylinder types.
+* 4D: There is no clear clear separation on the mileage delivered by different gear types.
+However this needs to be investigated further for any confounding variable.
+
+5. **Appendix: Plot 5**
+* 5A: Automatic transmission vehicles are heavier than manual and deliver lower mileage.
+* 5B: 8 cylinder engines are heavier than 6, which in turn is heavier than 4  and deliver lowest mileage.
+* 5C: V-Engines are faster than straight engines (i.e., lower qsec time), but deliver lower mileage. Since v-engines are mostly 8 cylinders and weight heavier, unlike straight engines which are mostly 4 cylinders.
+* 5D: There is no clear seperation for cylinders in terms of qsec time. This may possibly be attributed due to differences in displacement volume attributing to variances in performance. However there is a clear seperation in mileage based on cylinders.
+
+##Regression Analysis
+
+```{r, include=FALSE}
+#Stepwise linear regression using Bayesian Information Criterion (BIC)
+stepAIC(lm(mpg ~ .,mtcars), k = log(nrow(mtcars)),direction="both")
+```
+
+A quick stepwise regression with backward elimination returns a model with predictors `am`, `wt` and `qsec`. Linear regression for the suggested model is run with stepwise inclusion of the variables.
+```{r}
+fit1 <- lm(mpg ~ am,mtcars)
+fit2 <- lm(mpg ~ am + wt,mtcars)
+fit <- lm(mpg ~ am + wt + qsec,mtcars)
+summary(fit)$coef
+```
+
+The final model has a high adjusted $R^2$ of `r round(summary(fit)$adj.r.squared,3)`. All the coefficients except the intercept are significant (p<0.05) and the null hypothesis that the beta coefficients are 0 is rejected as there is no 0 in the 95% confidence interval. The intercept is 0. This implies manual tranmission cars deliver a higher mileage by a difference of 2.93 than automatic transmission cars, provided other variables remain constant.
+
+From the anova test, going from first to second, and second to third models result in significant reductions in RSS and hence result in a better model fit.
+
+###Regression Diagnostics
+
+1.**Residuals** (Refer **Appendix: Plot 6**)
+
+* **Residuals vs. Fitted Plot** shows no consistent pattern, supporting the accuracy of independence assumption.
+* **Normal Q-Q Plot** indicates that the residuals are normally distributed as points lie close to the line.
+* **Scale-Location Plot** confirms the constant variance assumption, as the points are randomly distributed.
+* **Residuals vs. Leverage Plot** implies that no outliers are present, as all values are within 0.5 bands.
+
+2.**Detecting Collinearity** - vif is below the recommended maximum value of 4 (Pan & Jackson, 2008). Hence multicollinearity is ruled out. `am` and `wt` both have relatively higher inflation factors due to correlation.
+```{r}
+vif(fit)
+```
+
+3.**Influential Observations** - From the hat values of the final model, Chrysler Imperial seems to exert a high leverage on the model.
+```{r}
+# calculate the hat values for the slope to measure leverage
+tail(sort(round(hatvalues(fit), 3)),3)
+```
+
+Hence the final model holds good. 
+
+##Conclusion
+
+This model is difficult to interpret, and the absence of DISPLACEMENT or HORSEPOWER, which intuition suggests should be important in the prediction of MPG, is surprising. This is primarily due to a bias to non-US automobiles (7 Mercedes, 1 Porsche, 1 Ferrari and 1 Maserati) which have different specs, especially engine specs. Therefore, a universal prediction model isn't possible.
+
+##Appendix
+
+**Plot 1: Distribution of mpg variable**
+
+```{r echo=FALSE}
+hist(mtcars$mpg, breaks=7, xlab = "Miles per Gallon", main="", xlim = range(10:35))
+```
+
+**Plot 2: MPG vs other variables**
+
+```{r}
+g1 <- ggplot(mtcars, aes(mpg,disp))+geom_point()
+g2 <- ggplot(mtcars, aes(mpg,hp))+geom_point()
+g3 <- ggplot(mtcars, aes(mpg,wt))+geom_point()
+g4 <- ggplot(mtcars, aes(mpg,qsec))+geom_point()
+plot_grid(g1, g2, g3 ,g4, ncol = 2, nrow = 2)
+```
+
+**Plot 3: Correlation between all variables**
+
+```{r echo=FALSE}
+corMat <- round(cor(mydata),2)
+hc <- hclust(as.dist((1-corMat)/2))
+corMat <-corMat[hc$order, hc$order]
+corMat[lower.tri(corMat)]<- NA
+diag(corMat) <- NA
+corMat <- melt(corMat, na.rm = TRUE)
+ggplot(corMat, aes(Var2, Var1, fill = value)) +
+    geom_tile(color = "white") +
+    scale_fill_gradient2(low = "blue", high = "red", mid = "white",midpoint = 0, limit = c(-1,1), space = "Lab",name="Pearson Correlation") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1,size = 10, hjust = 1)) +
+    coord_fixed() +
+    geom_text(aes(Var2, Var1, label = value), color = "black", size = 3)
+```
+
+**Plot 4: Boxplot of MPG vs AM, VS, Gear Variables**
+
+```{r echo=FALSE}
+par(mfrow = c(2, 2))
+boxplot(mtcars$mpg ~ mtcars$am, xlab="Transmission (0 = Automatic, 1 = Manual)", ylab="MPG")
+boxplot(mtcars$mpg ~ mtcars$vs, xlab="V/S (0 = V-engine, 1 = straight engine)", ylab="MPG")
+boxplot(mtcars$mpg ~ mtcars$cyl, xlab="Cylinders", ylab="MPG")
+boxplot(mtcars$mpg ~ mtcars$gear, xlab="Gears", ylab="MPG")
+```
+
+**Plot 5: MPG vs WT and QSEC by Transmission, Engine and Cylinder**
+
+```{r echo=FALSE}
+p1 <- ggplot(mtcars, aes(x=wt, y=mpg, group=am, color=am, height=3, width=3)) + geom_point() +  
+scale_colour_discrete(labels=c("Automatic", "Manual")) + 
+xlab("Weight")+ylab("MPG")+ theme(legend.title=element_blank())
+
+p2 <- ggplot(mtcars, aes(x=wt, y=mpg, group=factor(cyl), color=factor(cyl), height=3, width=3)) + geom_point() +  
+scale_colour_discrete(labels=c("4", "6", "8")) + 
+xlab("Weight")+ylab("MPG")+ theme(legend.title=element_blank())
+
+p3 <- ggplot(mtcars, aes(x=qsec, y=mpg, group=vs, color=vs, height=3, width=3)) + geom_point() +  
+scale_colour_discrete(labels=c("V-Engine", "Straight")) + 
+xlab("QSEC")+ylab("MPG")+ theme(legend.title=element_blank())
+
+p4 <- ggplot(mtcars, aes(x=qsec, y=mpg, group=factor(cyl), color=factor(cyl), height=3, width=3)) + geom_point() +  
+scale_colour_discrete(labels=c("4", "6", "8")) + 
+xlab("QSEC")+ylab("MPG") + theme(legend.title=element_blank())
+
+plot_grid(p1, p2, p3 ,p4, labels=c("A", "B", "C", "D"), ncol = 2, nrow = 2)
+```
+
+**Plot 6: Residuals**
+
+```{r echo=FALSE}
+par(mfrow = c(2, 2))
+plot(fit)
+```

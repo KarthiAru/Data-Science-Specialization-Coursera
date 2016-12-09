@@ -1,0 +1,71 @@
+---
+title: Is Exponential Distribution normal?
+author: "Karthik Arumugham"
+date: "29 April 2016"
+output: pdf_document
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(fig.path='Figs/', warning=FALSE, message=FALSE)
+```
+
+##Overview
+The purpose of this data analysis is to investigate the exponential distribution and compare it with the properties of a normal distribution.
+
+##Exponential distribution simulation
+The simulation generates a distribution of averages of 40 exponentials (lambda set to 0.2) over 1000 simulations.
+```{r}
+set.seed(1)
+lambda <- 0.2; n <- 40; s <- 1000
+sim <- replicate(s, rexp(n, lambda))
+meanE <- apply(sim, 2, mean)
+```
+###Comparison of sample mean and theoretical mean of the distribution
+```{r}
+meanS <- mean(meanE); meanS
+meanT <- 1/lambda; meanT
+```
+The analytics mean is `r round(meanS,3)`, the theoretical mean is `r round(meanT,3)`. The center of distribution of averages of 40 exponentials is very close to the theoretical center of the distribution. The **Plot 1** shows the distribution with both the means.
+
+###Comparison of sample variance and theoretical variance of the distribution
+```{r}
+varS <- (sd(meanE))^2; varS
+varT <- ((1/lambda)*(1/sqrt(n)))^2; varT
+```
+Standard Deviation of the distribution is `r round(sqrt(varS),3)` with the theoretical SD of `r round(sqrt(varT),3)`.
+
+###Check if distribution is approximately normal
+
+From **Plot 2**, the distribution of averages of 40 exponentials appears to be very close to a normal distribution. Also the C.I. for 1/lamda accomodates the simulated mean. $H_0$ that difference between both means is 0 is failed to be rejected.
+
+```{r}
+mean(meanS) + c(-1, 1) * 1.96 * sqrt(varS)/sqrt(n)
+```
+
+From **Plot 3**, the Q-Q plot shows that normality is probably a reasonably good approximation. But the Shapiro-Wilk normality test rejects the $H_0$ that 
+"the samples come from a normal distribution" against the $H_1$ that "the samples do not come from a normal distribution"
+```{r}
+shapiro.test(meanE)
+```
+
+##Appendix
+
+**Plot 1**: Histogram of means of exponential distribution
+```{r}
+hist(meanE, xlab = "mean", main = "")
+abline(v = meanS, col = "blue")
+abline(v = meanT, col = "grey")
+```
+
+**Plot 2**: Exponential vs Normal Distribution
+```{r}
+xfit <- seq(min(meanE), max(meanE), length=100)
+yfit <- dnorm(xfit, mean=meanT, sd=sqrt(varT))
+hist(meanE,breaks=n,prob=T,xlab = "Means",main="",ylab="Frequency"); lines(xfit, yfit, pch=25, lty=5)
+```
+
+**Plot 3**:
+```{r}
+qqnorm(meanE); qqline(meanE, col = 2)
+```
+
